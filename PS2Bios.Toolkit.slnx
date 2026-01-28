@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/CLI/">
+    <Project Path="src/CLI/PS2Bios.CLI.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/PS2Bios.Core.csproj" />
+  </Folder>
+</Solution>
