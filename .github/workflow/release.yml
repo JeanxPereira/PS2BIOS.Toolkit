@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet test tests/Tests/PS2Bios.Tests.csproj --configuration Release
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            ext: .exe
+            archive: zip
+          - rid: linux-x64
+            os: ubuntu-latest
+            ext:
+            archive: tar.gz
+          - rid: osx-x64
+            os: macos-latest
+            ext:
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      
+      - name: Publish
+        run: |
+          dotnet publish src/CLI/PS2Bios.CLI.csproj \
+          -c Release \
+          -r ${{ matrix.rid }} \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:DebugType=None \
+          -p:DebugSymbols=false \
+          -o release/${{ matrix.rid }}
+
+      - name: Archive (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd release/${{ matrix.rid }}
+          7z a ../../ps2bios-${{ matrix.rid }}.zip *
+
+      - name: Archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd release/${{ matrix.rid }}
+          tar -czvf ../../ps2bios-${{ matrix.rid }}.tar.gz *
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.rid }}
+          path: ps2bios-${{ matrix.rid }}.${{ matrix.archive }}
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          merge-multiple: true
+      
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.zip
+            *.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false
